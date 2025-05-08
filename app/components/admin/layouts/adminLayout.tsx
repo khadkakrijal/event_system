@@ -7,7 +7,7 @@ interface AdminProps {
   children: ReactNode;
 }
 
-const Admin: React.FC<AdminProps> = ({ children }) => {
+const  Admin: React.FC<AdminProps> = ({ children }) => {
   return (
     <div className="flex">
     <Sidebar/>
