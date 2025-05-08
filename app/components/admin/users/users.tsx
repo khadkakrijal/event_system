@@ -3,10 +3,14 @@ import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { InputText } from "primereact/inputtext";
 import { ProgressSpinner } from "primereact/progressspinner";
-import { FaPlus, FaEdit, FaTrash, FaTimes, FaSearch } from "react-icons/fa";
+import { FaPlus, FaEdit, FaTrash, FaSearch } from "react-icons/fa";
 import Swal from "sweetalert2";
 import UserForm, { TUser } from "./usersForm";
 import { useSession } from "next-auth/react";
+type Auth0User = {
+  user_id: string;
+  email: string;
+};
 
 const UserList: React.FC = () => {
   const { data: session } = useSession(); 
@@ -46,7 +50,7 @@ const UserList: React.FC = () => {
     setDisplayForm(false);
   };
 
-  const checkEmailExists = async (email: any, excludeUserId = null) => {
+  const checkEmailExists = async (email: string, excludeUserId: string | null = null): Promise<boolean> => {
     try {
       const token = await fetch("/api/auth0", {
         method: "POST",
@@ -63,10 +67,11 @@ const UserList: React.FC = () => {
       }).then((res) => res.json());
 
       return users.some(
-        (user: any) => user.email === email && user.user_id !== excludeUserId
+        (user: Auth0User) => user.email === email && user.user_id !== excludeUserId
       );
-    } catch (error) {
-      console.error("Failed to check email existence:", error);
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error("Failed to check email existence:", err.message);
       return false;
     }
   };
@@ -109,8 +114,9 @@ const UserList: React.FC = () => {
         window.location.reload();
       });
       setDisplayForm(false);
-    } catch (error: any) {
-      console.error("Error creating user:", error);
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error("Error creating user:", err.message);
       Swal.fire({
         icon: "error",
         title: "Error",
@@ -146,12 +152,13 @@ const UserList: React.FC = () => {
       });
       setDisplayForm(false);
       setEditMode(false);
-    } catch (error: any) {
-      console.error("Error updating user:", error);
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error("Error updating user:", err.message);
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: `Error in Auth0 handler: ${error.message}`,
+        text: `Error in Auth0 handler: ${err.message}`,
       });
       setLoading(false);
     }

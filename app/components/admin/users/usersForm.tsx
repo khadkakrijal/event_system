@@ -19,6 +19,13 @@ export type TUser = {
   user_metadata?: IUserMetadata;
 };
 
+type CreateUserPayload = {
+  email: string;
+  name: string;
+  password: string;
+  user_metadata: IUserMetadata;
+};
+
 interface UserFormProps {
   onUserCreated: (userData: TUser) => Promise<void>;
   onUserUpdated: (userId: string, userData: Partial<TUser>) => Promise<void>;
@@ -49,12 +56,7 @@ const UserForm: React.FC<UserFormProps> = ({
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const {
-    register,
-    setValue,
-    formState: { errors },
-    handleSubmit,
-  } = useForm();
+  const { register, setValue, handleSubmit } = useForm();
 
   useEffect(() => {
     if (editMode && selectedUser) {
@@ -83,7 +85,7 @@ const UserForm: React.FC<UserFormProps> = ({
   ) => {
     const { name, value } = e.target;
     if (name === "contact" && !/^\d*$/.test(value)) {
-      return; // Prevent non-numeric input
+      return;
     }
     setFormData((prevFormData) => ({
       ...prevFormData,
@@ -103,7 +105,7 @@ const UserForm: React.FC<UserFormProps> = ({
       return;
     }
 
-    const dataToSubmit = {
+    const updatePayload: Partial<TUser> = {
       email: formData.email,
       name: formData.name,
       user_metadata: {
@@ -112,10 +114,10 @@ const UserForm: React.FC<UserFormProps> = ({
       },
     };
 
-    const userData: any = {
+    const createPayload: CreateUserPayload = {
       email: formData.email,
       name: formData.name,
-      password: formData.password,
+      password: formData.password || "",
       user_metadata: {
         role: formData.role,
         contact: formData.contact,
@@ -125,15 +127,16 @@ const UserForm: React.FC<UserFormProps> = ({
     try {
       setLoading(true);
       if (editMode) {
-        await onUserUpdated(formData.user_id, dataToSubmit);
+        await onUserUpdated(formData.user_id, updatePayload);
       } else {
-        await onUserCreated(userData);
+        await onUserCreated(createPayload as TUser);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: `Error in Auth0 handler: ${error.message}`,
+        text: `Error in Auth0 handler: ${err.message}`,
         confirmButtonColor: "rgba(0, 130, 182, 0.85)",
       });
     } finally {
@@ -145,9 +148,7 @@ const UserForm: React.FC<UserFormProps> = ({
     try {
       const response = await fetch("/api/auth0", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "changeUserPassword",
           userId,
@@ -170,12 +171,12 @@ const UserForm: React.FC<UserFormProps> = ({
       });
       setShowChangePasswordModal(false);
       setPasswordChanged(true);
-    } catch (error: any) {
-      console.error("Error changing password:", error);
+    } catch (error: unknown) {
+      const err = error as Error;
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: `Error in Auth0 handler: ${error.message}`,
+        text: `Error in Auth0 handler: ${err.message}`,
         confirmButtonColor: "rgba(0, 130, 182, 0.85)",
       });
     }
@@ -200,7 +201,7 @@ const UserForm: React.FC<UserFormProps> = ({
       <form
         ref={FormRef}
         onSubmit={handleSubmit(onSubmit)}
-        className=" flex flex-col w-full pt-4 space-y-4  "
+        className="flex flex-col w-full pt-4 space-y-4"
       >
         <input type="hidden" name="user_id" value={formData.user_id} />
 
@@ -254,9 +255,7 @@ const UserForm: React.FC<UserFormProps> = ({
             onChange={handleChange}
             required
           >
-            <option value="" disabled>
-              Select role
-            </option>
+            <option value="" disabled>Select role</option>
             <option value="Super Admin">Super Admin</option>
             <option value="Admin">Admin</option>
           </select>
@@ -287,7 +286,7 @@ const UserForm: React.FC<UserFormProps> = ({
                 </div>
               )}
               {showChangePasswordModal && (
-                <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 ">
+                <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
                   <div className="bg-white rounded-lg p-4 relative w-[500px]">
                     <button
                       className="absolute top-2 right-2 text-gray-500 text-3xl cursor-pointer"
@@ -297,12 +296,7 @@ const UserForm: React.FC<UserFormProps> = ({
                     </button>
                     <h2 className="text-xl font-bold mb-4">Change Password</h2>
                     <div className="mb-4">
-                      <label
-                        htmlFor="newPassword"
-                        className="block text-gray-700"
-                      >
-                        New Password
-                      </label>
+                      <label htmlFor="newPassword" className="block text-gray-700">New Password</label>
                       <input
                         type="password"
                         id="newPassword"
@@ -312,12 +306,7 @@ const UserForm: React.FC<UserFormProps> = ({
                       />
                     </div>
                     <div className="mb-4">
-                      <label
-                        htmlFor="confirmPassword"
-                        className="block text-gray-700"
-                      >
-                        Confirm Password
-                      </label>
+                      <label htmlFor="confirmPassword" className="block text-gray-700">Confirm Password</label>
                       <input
                         type="password"
                         id="confirmPassword"
@@ -327,27 +316,15 @@ const UserForm: React.FC<UserFormProps> = ({
                       />
                     </div>
                     <div className="flex justify-end space-x-2">
-                      <button
-                        className="bg-gray-500 text-white p-2 px-4 rounded"
-                        onClick={() => setShowChangePasswordModal(false)}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        className="bg-blue-500 text-white p-2 px-4 rounded"
-                        onClick={handleChangePassword}
-                      >
-                        Change
-                      </button>
+                      <button className="bg-gray-500 text-white p-2 px-4 rounded" onClick={() => setShowChangePasswordModal(false)}>Cancel</button>
+                      <button className="bg-blue-500 text-white p-2 px-4 rounded" onClick={handleChangePassword}>Change</button>
                     </div>
                   </div>
                 </div>
               )}
             </div>
             {passwordChanged && (
-              <div className="bg-green-500 text-white p-2 px-4 rounded text-center">
-                Password Changed
-              </div>
+              <div className="bg-green-500 text-white p-2 px-4 rounded text-center">Password Changed</div>
             )}
           </>
         )}

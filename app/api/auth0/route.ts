@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import axios, { AxiosResponse } from "axios";
+import axios, { AxiosError, AxiosResponse } from "axios";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -32,26 +32,21 @@ async function generateToken(): Promise<string> {
 
   try {
     const response: AxiosResponse<TokenResponse> = await axios.post(url, data, {
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
     });
-    console.log(response.data.access_token, "response for token//.//");
     return response.data.access_token;
-  } catch (error: any) {
-    console.error("Error generating token:", error.message);
-    throw new Error(`Error generating token: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as AxiosError;
+    console.error("Error generating token:", err.message);
+    throw new Error(`Error generating token: ${err.message}`);
   }
 }
 
-async function createUser(userData: UserData, token: string): Promise<any> {
+async function createUser(userData: UserData, token: string) {
   try {
-    const response: AxiosResponse = await axios.post(
+    const response = await axios.post(
       "https://dev-yhh3mpvvi0nowbsn.us.auth0.com/api/v2/users",
-      {
-        ...userData,
-        connection: "Username-Password-Authentication",
-      },
+      { ...userData, connection: "Username-Password-Authentication" },
       {
         headers: {
           "Content-Type": "application/json",
@@ -59,17 +54,17 @@ async function createUser(userData: UserData, token: string): Promise<any> {
         },
       }
     );
-
     return response.data;
-  } catch (error: any) {
-    console.error("Error creating user:", error.message);
-    throw new Error(`Failed to create user: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as AxiosError;
+    console.error("Error creating user:", err.message);
+    throw new Error(`Failed to create user: ${err.message}`);
   }
 }
 
-async function getAllUsers(token: string): Promise<any> {
+async function getAllUsers(token: string): Promise<AxiosResponse> {
   try {
-    const response: AxiosResponse = await axios.get(
+    return await axios.get(
       "https://dev-yhh3mpvvi0nowbsn.us.auth0.com/api/v2/users",
       {
         headers: {
@@ -78,22 +73,20 @@ async function getAllUsers(token: string): Promise<any> {
         },
       }
     );
-
-    return response;
-  } catch (error: any) {
-    console.error("Error fetching users:", error.message);
-    throw new Error(`Failed to fetch users: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as AxiosError;
+    console.error("Error fetching users:", err.message);
+    throw new Error(`Failed to fetch users: ${err.message}`);
   }
 }
 
 async function updateUserDetails(
-  userData: UserData,
+  userData: Partial<UserData>,
   userId: string,
   token: string
-): Promise<any> {
-  console.log("Updating user with data:", userData);
+) {
   try {
-    const response: AxiosResponse = await axios.patch(
+    const response = await axios.patch(
       `https://dev-yhh3mpvvi0nowbsn.us.auth0.com/api/v2/users/${userId}`,
       userData,
       {
@@ -103,11 +96,11 @@ async function updateUserDetails(
         },
       }
     );
-
     return response.data;
-  } catch (error: any) {
-    console.error("Error updating user:", error.message);
-    throw new Error(`Failed to update user: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as AxiosError;
+    console.error("Error updating user:", err.message);
+    throw new Error(`Failed to update user: ${err.message}`);
   }
 }
 
@@ -115,9 +108,9 @@ async function changeUserPassword(
   userId: string,
   newPassword: string,
   token: string
-): Promise<any> {
+) {
   try {
-    const response: AxiosResponse = await axios.patch(
+    const response = await axios.patch(
       `https://dev-yhh3mpvvi0nowbsn.us.auth0.com/api/v2/users/${userId}`,
       {
         password: newPassword,
@@ -130,17 +123,17 @@ async function changeUserPassword(
         },
       }
     );
-
     return response.data;
-  } catch (error: any) {
-    console.error("Error changing password:", error.message);
-    throw new Error(`Failed to change password: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as AxiosError;
+    console.error("Error changing password:", err.message);
+    throw new Error(`Failed to change password: ${err.message}`);
   }
 }
 
-async function deleteUser(userId: string, token: string): Promise<any> {
+async function deleteUser(userId: string, token: string): Promise<void> {
   try {
-    const response: AxiosResponse = await axios.delete(
+    await axios.delete(
       `https://dev-yhh3mpvvi0nowbsn.us.auth0.com/api/v2/users/${userId}`,
       {
         headers: {
@@ -149,55 +142,51 @@ async function deleteUser(userId: string, token: string): Promise<any> {
         },
       }
     );
-
-    return response.data;
-  } catch (error: any) {
-    console.error("Error deleting user:", error.message);
-    throw new Error(`Failed to delete user: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as AxiosError;
+    console.error("Error deleting user:", err.message);
+    throw new Error(`Failed to delete user: ${err.message}`);
   }
 }
 
 export async function POST(req: NextRequest) {
-  const { action, userId, userData, newPassword } = await req.json();
+  const body = (await req.json()) as {
+    action: string;
+    userId?: string;
+    userData?: UserData;
+    newPassword?: string;
+  };
 
   try {
     const token = await generateToken();
 
-    switch (action) {
+    switch (body.action) {
       case "createUser":
-        const createdUser = await createUser(userData, token);
-        return NextResponse.json(createdUser);
-
+        return NextResponse.json(await createUser(body.userData!, token));
       case "getAllUsers":
         const users = await getAllUsers(token);
         return NextResponse.json(users.data);
-
       case "updateUserDetails":
-        const updatedUser = await updateUserDetails(userData, userId, token);
-        return NextResponse.json(updatedUser);
-
-      case "changeUserPassword":
-        const passwordChanged = await changeUserPassword(
-          userId,
-          newPassword,
-          token
+        return NextResponse.json(
+          await updateUserDetails(body.userData!, body.userId!, token)
         );
-        return NextResponse.json(passwordChanged);
-
+      case "changeUserPassword":
+        return NextResponse.json(
+          await changeUserPassword(body.userId!, body.newPassword!, token)
+        );
       case "deleteUser":
-        const deletedUser = await deleteUser(userId, token);
+        await deleteUser(body.userId!, token);
         return NextResponse.json({ message: "User deleted successfully" });
-
       default:
         return NextResponse.json(
           { message: "Invalid action" },
           { status: 400 }
         );
     }
-  } catch (error: any) {
-    console.error("Error in Auth0 handler:", error.message);
+  } catch (error: unknown) {
+    const err = error as Error;
     return NextResponse.json(
-      { message: `Error in Auth0 handler: ${error.message}` },
+      { message: `Error in Auth0 handler: ${err.message}` },
       { status: 500 }
     );
   }
