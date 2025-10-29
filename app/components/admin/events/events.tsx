@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+"use client";
+
+import React, { useEffect, useState } from "react";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Dialog } from "primereact/dialog";
@@ -6,71 +8,132 @@ import { Button } from "primereact/button";
 import { InputText } from "primereact/inputtext";
 import Image from "next/image";
 import { FaFileUpload, FaEdit, FaTrash } from "react-icons/fa";
+import { EventsAPI } from "@/app/api/apiService";
+import type { Event } from "@/app/api/apiContract";
 
-interface Event {
-  id: number;
-  title: string;
-  date: string;
-  location: string;
-  venue: string;
-  image: string;
-}
+// helper: Next <input type="date" /> gives "YYYY-MM-DD".
+// backend expects ISO -> normalize to midnight UTC.
+const toISODate = (d: string) => (d.includes("T") ? d : `${d}T00:00:00Z`);
+const fromISODateOnly = (iso?: string) =>
+  iso ? new Date(iso).toISOString().slice(0, 10) : "";
 
-const AdminEventsPage:React.FC<Event> = () => {
+type FormEvent = Partial<Pick<Event,
+  "title" | "date" | "location" | "venue" | "featured_image" | "description" | "ticket_available"
+>>;
+
+const initialForm: FormEvent = {
+  title: "",
+  date: "",
+  location: "",
+  venue: "",
+  featured_image: "",
+  description: "",
+  ticket_available: true,
+};
+
+const AdminEventsPage: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
-  const [newEvent, setNewEvent] = useState<Event>({
-    id: 0,
-    title: "",
-    date: "",
-    location: "",
-    venue: "",
-    image: "",
-  });
+  const [form, setForm] = useState<FormEvent>(initialForm);
   const [dialogVisible, setDialogVisible] = useState(false);
-  const [editMode, setEditMode] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
 
+  const loadEvents = async () => {
+    try {
+      setLoading(true);
+      const data = await EventsAPI.list(); // GET /events
+      setEvents(data || []);
+    } catch (e) {
+      console.error("Failed to load events:", e);
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEvents();
+  }, []);
+
+  const openCreate = () => {
+    setEditId(null);
+    setForm(initialForm);
+    setDialogVisible(true);
+  };
+
+  const openEdit = (row: Event) => {
+    setEditId(row.id);
+    setForm({
+      title: row.title,
+      date: fromISODateOnly(row.date),
+      location: row.location || "",
+      venue: row.venue || "",
+      featured_image: row.featured_image || "",
+      description: row.description || "",
+      ticket_available: !!row.ticket_available,
+    });
+    setDialogVisible(true);
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewEvent({ ...newEvent, [e.target.name]: e.target.value });
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewEvent({ ...newEvent, image: reader.result as string });
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setForm((prev) => ({ ...prev, featured_image: String(reader.result) }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async () => {
+    if (!form.title || !form.date) return;
+
+    try {
+      setSaving(true);
+
+      const payload = {
+        title: form.title!,
+        date: toISODate(form.date!),
+        location: form.location || "",
+        venue: form.venue || "",
+        featured_image: form.featured_image || "/events.jpg",
+        description: form.description || "",
+        ticket_available: form.ticket_available ?? true,
       };
-      reader.readAsDataURL(file);
+
+      if (editId == null) {
+        // CREATE
+        await EventsAPI.create(payload);
+      } else {
+        // UPDATE
+        await EventsAPI.update(editId, payload);
+      }
+
+      setDialogVisible(false);
+      setForm(initialForm);
+      setEditId(null);
+      await loadEvents(); // refresh table
+    } catch (e) {
+      console.error("Save failed:", e);
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleSubmit = () => {
-    if (editMode && editId !== null) {
-      const updated = events.map((event) =>
-        event.id === editId ? { ...newEvent, id: editId } : event
-      );
-      setEvents(updated);
-    } else {
-      const updatedEvents = [...events, { ...newEvent, id: events.length + 1 }];
-      setEvents(updatedEvents);
+  const handleDelete = async (id: number) => {
+    try {
+      const ok = window.confirm("Delete this event?");
+      if (!ok) return;
+      await EventsAPI.remove(id);
+      await loadEvents();
+    } catch (e) {
+      console.error("Delete failed:", e);
     }
-    setNewEvent({ id: 0, title: "", date: "", location: "", venue: "", image: "" });
-    setDialogVisible(false);
-    setEditMode(false);
-    setEditId(null);
-  };
-
-  const handleEdit = (event: Event) => {
-    setNewEvent(event);
-    setEditId(event.id);
-    setEditMode(true);
-    setDialogVisible(true);
-  };
-
-  const handleDelete = (id: number) => {
-    const filtered = events.filter((event) => event.id !== id);
-    setEvents(filtered);
   };
 
   return (
@@ -81,18 +144,17 @@ const AdminEventsPage:React.FC<Event> = () => {
           label="Add Event"
           icon="pi pi-plus"
           className="bg-blue-600 text-white hover:bg-blue-700 border-none px-4 py-2 rounded-md"
-          onClick={() => {
-            setDialogVisible(true);
-            setEditMode(false);
-            setNewEvent({ id: 0, title: "", date: "", location: "", venue: "", image: "" });
-          }}
+          onClick={openCreate}
         />
       </div>
 
+      {/* Create / Edit dialog */}
       <Dialog
         header={
           <div className="text-center py-2">
-            <h2 className="text-2xl font-bold text-white">{editMode ? "Edit Event" : "Create New Event"}</h2>
+            <h2 className="text-2xl font-bold text-white">
+              {editId == null ? "Create New Event" : `Edit Event #${editId}`}
+            </h2>
             <p className="text-sm text-white">Fill in the details below</p>
           </div>
         }
@@ -110,19 +172,14 @@ const AdminEventsPage:React.FC<Event> = () => {
         >
           {["title", "date", "location", "venue"].map((field) => (
             <div key={field} className="flex flex-col">
-              <label
-                htmlFor={field}
-                className="mb-2 font-semibold text-white capitalize"
-              >
-                {field === "date"
-                  ? "Event Date"
-                  : field.charAt(0).toUpperCase() + field.slice(1)}
+              <label htmlFor={field} className="mb-2 font-semibold text-white capitalize">
+                {field === "date" ? "Event Date" : field.charAt(0).toUpperCase() + field.slice(1)}
               </label>
               <InputText
                 id={field}
                 name={field}
                 type={field === "date" ? "date" : "text"}
-                value={newEvent[field as keyof Event] as string}
+                value={(form as any)[field] || ""}
                 onChange={handleChange}
                 className="border bg-white border-gray-300 text-black px-4 py-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
@@ -131,99 +188,79 @@ const AdminEventsPage:React.FC<Event> = () => {
           ))}
 
           <div className="flex flex-col">
-            <label htmlFor="image" className="mb-2 font-semibold text-white">Event Image</label>
-            <div className="flex items-center justify-center bg-white rounded-md p-4 border border-gray-300 cursor-pointer hover:ring-2 hover:ring-blue-400">
-              <label htmlFor="image-upload" className="flex items-center gap-2 text-black">
+            <label htmlFor="image" className="mb-2 font-semibold text-white">
+              Event Image
+            </label>
+            <div className="flex items-center justify-between bg-white rounded-md p-3 border border-gray-300">
+              <label htmlFor="image-upload" className="flex items-center gap-2 text-black cursor-pointer">
                 <FaFileUpload className="text-xl" />
-                <span>{newEvent.image ? "Image Selected" : "Choose Image"}</span>
+                <span>{form.featured_image ? "Image Selected" : "Choose Image"}</span>
               </label>
-              <input
-                id="image-upload"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleImageUpload}
-              />
+              <input id="image-upload" type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
             </div>
           </div>
 
           <div className="flex justify-end pt-2">
             <Button
-              label={editMode ? "Update Event" : "Create Event"}
+              label={saving ? "Saving..." : editId == null ? "Create Event" : "Update Event"}
               icon="pi pi-check"
               type="submit"
+              disabled={saving}
               className="bg-green-600 text-white hover:bg-green-700 border-none px-6 py-2 rounded-md"
             />
           </div>
         </form>
       </Dialog>
 
+      {/* Events Table */}
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         <DataTable
           value={events}
           paginator
           rows={5}
           stripedRows
-          className="p-datatable-sm border border-gray-300 p-2"
+          loading={loading}
+          className="p-datatable-sm border border-gray-300 p-2 "
         >
+          {/* <Column field="id" header="ID" style={{ width: 80 }} /> */}
+          <Column field="title" header="Title"  bodyClassName="py-6" />
+          <Column field="date" header="Date" body={(r: Event) => new Date(r.date).toLocaleString()} />
+          <Column field="location" header="Location"  bodyClassName="max-w-[150px] truncate "/>
+          <Column field="venue" header="Venue" bodyClassName="max-w-[150px] truncate "/>
           <Column
-            field="title"
-            header="Title"
-            bodyClassName="border border-gray-200 px-2 py-1 text-center"
-          ></Column>
-          <Column
-            field="date"
-            header="Date"
-            bodyClassName="border border-gray-200 px-2 py-1 text-center"
-          ></Column>
-          <Column
-            field="location"
-            header="Location"
-            bodyClassName="border border-gray-200 px-2 py-1 text-center"
-          ></Column>
-          <Column
-            field="venue"
-            header="Venue"
-            bodyClassName="border border-gray-200 px-2 py-1 text-center"
-          ></Column>
-          <Column
-            field="image"
+            field="featured_image"
             header="Image"
-            body={(rowData) => (
+            body={(row: Event) => (
               <Image
-              src={rowData.image}
-              alt="event"
-              width={100} 
-              height={100} 
-              className="h-12 w-16 object-cover rounded text-center "
+                src={row.featured_image || "/events.jpg"}
+                alt="event"
+                width={100}
+                height={100}
+                className="h-12 w-16 object-cover rounded"
               />
-            
-               
             )}
-            bodyClassName="border border-gray-200 px-2 py-1 text-center"
-          ></Column>
+          />
           <Column
             header="Actions"
-             bodyClassName="border border-gray-200 px-2 py-1 text-center"
-            body={(rowData) => (
-              <div className="flex gap-4 text-red-600 text-xl items-center " >
+            body={(row: Event) => (
+              <div className="flex gap-4 text-xl items-center">
                 <button
-                  onClick={() => handleEdit(rowData)}
-                  className="hover:text-yellow-500"
+                  onClick={() => openEdit(row)}
+                  className="text-yellow-600 hover:text-yellow-700"
                   title="Edit"
                 >
                   <FaEdit />
                 </button>
                 <button
-                  onClick={() => handleDelete(rowData.id)}
-                  className="hover:text-red-800"
+                  onClick={() => handleDelete(row.id)}
+                  className="text-red-600 hover:text-red-800"
                   title="Delete"
                 >
                   <FaTrash />
                 </button>
               </div>
             )}
-          ></Column>
+          />
         </DataTable>
       </div>
     </div>

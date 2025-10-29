@@ -22,7 +22,7 @@ export default function Eventpage() {
   return (
     <Admin>
       {" "}
-      <AdminEventsPage id={0} title={""} date={""} location={""} venue={""} image={""} />
+      <AdminEventsPage />
     </Admin>
   );
 }

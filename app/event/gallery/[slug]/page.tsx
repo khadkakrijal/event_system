@@ -1,41 +1,140 @@
 "use client";
 
-import React from "react";
-import { useParams } from "next/navigation";
-import eventsData from "@/app/components/data/eventsData";
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import MasterLayout from "@/app/components/masterlayout/master";
 import slugify from "@/app/utils/slugify";
 import Image from "next/image";
 import Photos from "@/app/components/imageSlider/photos";
-import galleryData from "@/app/components/data/galleryData";
+import { EventsAPI, GalleriesAPI, AlbumsAPI } from "@/app/api/apiService";
+import type { Event } from "@/app/api/apiContract";
+import Link from "next/link";
 
-const EventgalleryPage = () => {
-  const params = useParams();
-  const slug = params?.slug as string;
-  const event = eventsData.find((item) => slugify(item.title) === slug);
+type PhotoItem = { image: string };
 
-  if (!event) {
-    return <div className="text-white p-10">Event not found</div>;
+const EventGalleryPage = () => {
+  const { slug } = useParams() as { slug: string };
+  const router = useRouter();
+
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // data for gallery
+  const [galleryImages, setGalleryImages] = useState<PhotoItem[]>([]);
+  const [galleryLoading, setGalleryLoading] = useState(false);
+
+  // 1) load all events once
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await EventsAPI.list(); // GET /events
+        setEvents(Array.isArray(data) ? data : []);
+        setError(null);
+      } catch (e) {
+        console.error("Failed to load events:", e);
+        setError("Failed to load event.");
+        setEvents([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  // 2) find the event by slug
+  const event = useMemo(
+    () => events.find((e) => slugify(e.title) === slug),
+    [events, slug]
+  );
+
+  // 3) redirect upcoming events to detail page
+  useEffect(() => {
+    if (!event) return;
+    const isUpcoming = new Date(event.date).getTime() > Date.now();
+    if (isUpcoming) {
+      router.replace(`/event/detail/${slug}`);
+    }
+  }, [event, slug, router]);
+
+  // 4) if past event, load gallery (first gallery + its images)
+  useEffect(() => {
+    const loadGallery = async () => {
+      if (!event) return;
+      const isPast = new Date(event.date).getTime() < Date.now();
+      if (!isPast) return;
+
+      try {
+        setGalleryLoading(true);
+        // GET /galleries?eventId=ID
+        const galleries = await GalleriesAPI.list({ eventId: event.id });
+        if (!galleries || galleries.length === 0) {
+          setGalleryImages([]); // no gallery yet
+          return;
+        }
+
+        const gallery = galleries[0]; // pick the first gallery
+        // GET /albums?galleryId=ID  -> [{ id, gallery_id, image_url }]
+        const albums = await AlbumsAPI.list({ galleryId: gallery.id });
+        const images: PhotoItem[] = (albums || []).map((a) => ({
+          image: a.image_url || "/events.jpg",
+        }));
+        setGalleryImages(images);
+      } catch (e) {
+        console.error("Failed to load gallery:", e);
+        setGalleryImages([]);
+      } finally {
+        setGalleryLoading(false);
+      }
+    };
+
+    loadGallery();
+  }, [event]);
+
+  // ---------- render states ----------
+  if (loading) {
+    return (
+      <MasterLayout>
+        <div className="text-white p-10">Loading event…</div>
+      </MasterLayout>
+    );
   }
 
-  const relatedGallery = galleryData.find(
-    (gallery) => gallery.eventId === event.id
-  );
-  const relatedImages = relatedGallery ? relatedGallery.images : [];
+  if (error) {
+    return (
+      <MasterLayout>
+        <div className="text-red-400 p-10">{error}</div>
+      </MasterLayout>
+    );
+  }
 
+  if (!event) {
+    return (
+      <MasterLayout>
+        <div className="text-white p-10">Event not found</div>
+      </MasterLayout>
+    );
+  }
+
+  // If it’s upcoming, we’ll have redirected already. Show nothing while redirecting.
+  const isUpcoming = new Date(event.date).getTime() > Date.now();
+  if (isUpcoming) {
+    return null;
+  }
+
+  // ---------- main UI for past event ----------
   return (
     <MasterLayout>
       <div className="flex flex-col justify-center items-center bg-black pb-10 relative">
         {/* Top Banner */}
         <div className="md:h-screen h-[600px] w-full relative">
           <Image
-            src={event.featuredImage}
+            src={event.featured_image || "/events.jpg"}
             alt={event.title}
             fill
             className="object-cover"
             priority
           />
-          <div className="absolute top-1/2 md:left-1/2 left-[50%]  transform -translate-x-1/2 -translate-y-1/2 px-4 z-10">
+          <div className="absolute top-1/2 left-1/2  -translate-x-1/2 -translate-y-1/2 px-4 z-10">
             <div className="text-center text-white backdrop-blur-sm bg-black/30 rounded-md p-4 md:p-6">
               <h1 className="text-2xl md:text-4xl font-bold uppercase drop-shadow-lg tracking-wide md:w-full w-[300px]">
                 Capturing the Spirit of the Moment
@@ -58,37 +157,26 @@ const EventgalleryPage = () => {
                 {event.title}
               </h1>
               <p className="text-sm md:text-base font-medium">
-                📅 {event.date} | 📍 {event.venue}, {event.location}
+                📅 {new Date(event.date).toLocaleString()} | 📍 {event.venue}
+                {event.venue && event.location ? ", " : ""}{event.location}
               </p>
               <hr className="border border-gray-300 w-[50%] mx-auto" />
-              <p>
-                {
-                  "Lorem Ipsum is simply dummy text of the printing and typesetting industry. It has been the industry's standard dummy text ever since the 1500s."
-                }
-              </p>
-              <p>
-                {
-                  "It survived five centuries and the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s."
-                }
-              </p>
-              <p>
-                {
-                  "Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in classical Latin literature from 45 BC."
-                }
-              </p>
-              <p>
-                {
-                  " The standard chunk of Lorem Ipsum used since the 1500s is reproduced below for those interested."
-                }
-              </p>
+              <p>{event.description || "Relive moments from this event in the gallery below."}</p>
             </div>
           </div>
         </div>
 
-        <Photos Images={relatedImages} />
+        {/* Photos from Albums (first gallery) */}
+        {galleryLoading ? (
+          <div className="text-white py-8">Loading gallery…</div>
+        ) : galleryImages.length === 0 ? (
+          <div className="text-white py-8">No gallery found for this event.</div>
+        ) : (
+          <Photos Images={galleryImages} />
+        )}
       </div>
     </MasterLayout>
   );
 };
 
-export default EventgalleryPage;
+export default EventGalleryPage;

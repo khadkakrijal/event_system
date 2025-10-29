@@ -1,37 +1,96 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import React from "react";
-import eventsData from "@/app/components/data/eventsData";
-import galleryData from "@/app/components/data/galleryData";
-import AlbumData from "@/app/components/data/albumData";
-import slugify from "@/app/utils/slugify";
+import React, { useEffect, useMemo, useState } from "react";
 import MasterLayout from "@/app/components/masterlayout/master";
-import Photos from "@/app/components/imageSlider/photos";
-
+import slugify from "@/app/utils/slugify";
 import Image from "next/image";
 import Animationimageslider from "@/app/components/imageSlider/animatedImageSlider";
+import Photos from "@/app/components/imageSlider/photos";
+import { EventsAPI, GalleriesAPI, AlbumsAPI } from "@/app/api/apiService";
+import type { Event } from "@/app/api/apiContract";
+
+type MediaItem = { type: "image"; source: string };
 
 const AlbumPage = () => {
-  const params = useParams();
-  const slug = params?.slug as string;
+  const { slug } = useParams() as { slug: string };
 
-  const event = eventsData.find((event) => slugify(event.title) === slug);
-  const gallery = galleryData.find((g) => g.eventId === event?.id);
-  const albumImages = AlbumData.filter((img) => img.galleryId === gallery?.id);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const photos = event ? [{ image: event.featuredImage }] : [];
+  // 1) load all events
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await EventsAPI.list(); // GET /events
+        setEvents(data || []);
+      } catch (e) {
+        console.error("Failed to load events:", e);
+        setError("Failed to load album.");
+      }
+    })();
+  }, []);
 
-  const mediaItems =
-    albumImages?.map((img) => ({
-      type: "image" as const,
-      source: img.image,
-    })) || [];
+  // 2) find event by slug
+  const event = useMemo(
+    () => events.find((e) => slugify(e.title) === slug),
+    [events, slug]
+  );
 
-  if (!event || !gallery) {
+  // 3) load gallery + albums for this event
+  useEffect(() => {
+    const loadAlbums = async () => {
+      if (!event) return;
+      try {
+        setLoading(true);
+        const galleries = await GalleriesAPI.list({ eventId: event.id });
+        if (!galleries || galleries.length === 0) {
+          setMediaItems([]);
+          return;
+        }
+        // For now: pick the first gallery
+        const gallery = galleries[0];
+        const albums = await AlbumsAPI.list({ galleryId: gallery.id });
+        const media = (albums || []).map((a) => ({
+          type: "image" as const,
+          source: a.image_url || "/events.jpg",
+        }));
+        setMediaItems(media);
+        setError(null);
+      } catch (e) {
+        console.error("Failed to load albums:", e);
+        setError("Failed to load album.");
+        setMediaItems([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadAlbums();
+  }, [event]);
+
+  // ---------- render ----------
+  if (loading) {
     return (
       <MasterLayout>
-        <div className="text-white text-center mt-20">Gallery Not Found</div>
+        <div className="text-white text-center mt-20">Loading album…</div>
+      </MasterLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <MasterLayout>
+        <div className="text-red-400 text-center mt-20">{error}</div>
+      </MasterLayout>
+    );
+  }
+
+  if (!event) {
+    return (
+      <MasterLayout>
+        <div className="text-white text-center mt-20">Event not found</div>
       </MasterLayout>
     );
   }
@@ -42,7 +101,7 @@ const AlbumPage = () => {
         {/* Top Banner */}
         <div className="md:h-screen h-[600px] w-full relative">
           <Image
-            src={event.featuredImage}
+            src={event.featured_image || "/events.jpg"}
             alt={event.title}
             fill
             className="object-cover"
@@ -63,40 +122,25 @@ const AlbumPage = () => {
               <h1 className="text-3xl md:text-4xl font-bold uppercase">
                 {event.title}
               </h1>
-              <p className="text-gray-400 text-lg text-center">
-                {gallery.title2}
-              </p>
               <p className="text-sm md:text-base font-medium">
-                📅 {event.date} | 📍 {event.venue}, {event.location}
+                📅 {new Date(event.date).toLocaleString()} | 📍 {event.venue}
+                {event.venue && event.location ? ", " : ""}{event.location}
               </p>
               <hr className="border border-gray-300 w-[50%] mx-auto" />
-              <p>
-                {
-                  "Lorem Ipsum is simply dummy text of the printing and typesetting industry. It has been the industry's standard dummy text ever since the 1500s."
-                }
-              </p>
-              <p>
-                {
-                  "It survived five centuries and the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s."
-                }
-              </p>
-              <p>
-                {
-                  "Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in classical Latin literature from 45 BC."
-                }
-              </p>
-              <p>
-                {
-                  " The standard chunk of Lorem Ipsum used since the 1500s is reproduced below for those interested."
-                }
-              </p>
+              <p>{event.description || "Browse the event album below."}</p>
             </div>
           </div>
         </div>
+
         {/* Album Gallery Slider */}
-        <Animationimageslider Images={mediaItems} event={event} />
-        {/* Featured Image */}
-        <Photos Images={photos} />
+        {mediaItems.length > 0 ? (
+          <Animationimageslider Images={mediaItems} event={event} />
+        ) : (
+          <div className="text-white py-10">No album found for this event.</div>
+        )}
+
+        {/* Featured Image (single) */}
+        <Photos Images={[{ image: event.featured_image || "/events.jpg" }]} />
       </div>
     </MasterLayout>
   );

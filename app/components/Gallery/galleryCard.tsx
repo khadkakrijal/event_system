@@ -1,36 +1,62 @@
 "use client";
 
 import Link from "next/link";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { IoFilter } from "react-icons/io5";
-import eventsData from "../data/eventsData";
-import galleryData from "../data/galleryData";
 import slugify from "@/app/utils/slugify";
 import Image from "next/image";
+import { EventsAPI, GalleriesAPI, AlbumsAPI } from "@/app/api/apiService";
+import type { Event } from "@/app/api/apiContract";
+
+interface GalleryEvent extends Event {
+  galleryImages: { image: string }[];
+}
 
 const GalleryCard: React.FC = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [viewMode, setViewMode] = useState("");
   const [visibleCount, setVisibleCount] = useState(6);
 
+  const [galleryEvents, setGalleryEvents] = useState<GalleryEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const toggleDropdown = () => setIsDropdownOpen(!isDropdownOpen);
   const toggleViewMode = () =>
     setViewMode(viewMode === "horizontal" ? "vertical" : "horizontal");
 
-  // Filter past events
-  const pastEvents = eventsData.filter((event) => {
-    const eventDate = new Date(event.date);
-    return eventDate < new Date();
-  });
+  // 🔹 Load past events and galleries
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        const events = await EventsAPI.list({ mode: "past" });
 
-  // Merge gallery data with past events
-  const galleryEvents = pastEvents.map((event) => {
-    const gallery = galleryData.find((g) => g.eventId === event.id);
-    return {
-      ...event,
-      galleryImages: gallery?.images || [],
-    };
-  });
+        const merged: GalleryEvent[] = [];
+
+        for (const event of events) {
+          const galleries = await GalleriesAPI.list({ eventId: event.id });
+          if (galleries && galleries.length > 0) {
+            const albums = await AlbumsAPI.list({ galleryId: galleries[0].id });
+            const images = (albums || []).map((a) => ({
+              image: a.image_url || "/events.jpg",
+            }));
+            merged.push({ ...event, galleryImages: images });
+          } else {
+            merged.push({ ...event, galleryImages: [] });
+          }
+        }
+
+        setGalleryEvents(merged);
+        setError(null);
+      } catch (e) {
+        console.error("Failed to load galleries:", e);
+        setError("Failed to load gallery.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   const visibleEvents = galleryEvents.slice(0, visibleCount);
 
@@ -97,27 +123,31 @@ const GalleryCard: React.FC = () => {
             : "md:grid md:grid-cols-3"
         } gap-7`}
       >
-        {visibleEvents.map((event, index) => (
-          <Link key={index} href={`/event/album/${slugify(event.title)}`}>
-            <div className="rounded-lg h-fit md:w-[25vw] space-y-3 xs:w-[72vw] sm:w-[72vw] bg-cover hover:bg-custom-gray p-2 cursor-pointer">
-              <Image
-              height={100}
-              width={100}
-                src={event.galleryImages[0]?.image || "/events.jpg"}
-                alt={event.title}
-                className="rounded-lg md:w-[24vw] md:h-[24vw] xs:h-[70vw] xs:w-[70vw] sm:w-[70vw] sm:h-[70vw] object-cover"
-              />
-              <div className="md:flex flex-col items-center justify-center text-white text-center">
-                <p className="text-[24px] line-clamp-2 font-semibold md:w-[24vw] sm:w-[65vw] xs:w-[65vw]">
-                  {event.title}
-                </p>
-                <h2 className="font-light">
-                  {event.venue + ", " + event.location}
-                </h2>
+        {loading && <p className="text-white">Loading galleries…</p>}
+        {error && <p className="text-red-400">{error}</p>}
+        {!loading &&
+          !error &&
+          visibleEvents.map((event) => (
+            <Link key={event.id} href={`/event/album/${slugify(event.title)}`}>
+              <div className="rounded-lg h-fit md:w-[25vw] space-y-3 xs:w-[72vw] sm:w-[72vw] bg-cover hover:bg-custom-gray p-2 cursor-pointer">
+                <Image
+                  height={100}
+                  width={100}
+                  src={event.galleryImages[0]?.image || "/events.jpg"}
+                  alt={event.title}
+                  className="rounded-lg md:w-[24vw] md:h-[24vw] xs:h-[70vw] xs:w-[70vw] sm:w-[70vw] sm:h-[70vw] object-cover"
+                />
+                <div className="md:flex flex-col items-center justify-center text-white text-center">
+                  <p className="text-[24px] line-clamp-2 font-semibold md:w-[24vw] sm:w-[65vw] xs:w-[65vw]">
+                    {event.title}
+                  </p>
+                  <h2 className="font-light">
+                    {event.venue + ", " + event.location}
+                  </h2>
+                </div>
               </div>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          ))}
       </div>
 
       {galleryEvents.length > visibleCount && (

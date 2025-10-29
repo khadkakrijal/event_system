@@ -1,48 +1,95 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import eventsData from "@/app/components/data/eventsData";
 import MasterLayout from "@/app/components/masterlayout/master";
 import slugify from "@/app/utils/slugify";
 import Image from "next/image";
 import Link from "next/link";
+import { EventsAPI } from "@/app/api/apiService";
+import type { Event } from "@/app/api/apiContract";
 
 const EventDetailPage = () => {
-  const params = useParams();
-  const slug = params?.slug as string;
-  const event = eventsData.find((item) => slugify(item.title) === slug);
+  const { slug } = useParams() as { slug: string };
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // fetch all events (both past & upcoming)
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await EventsAPI.list(); // GET /events (no mode)
+        setEvents(Array.isArray(data) ? data : []);
+        setError(null);
+      } catch (e) {
+        console.error("Failed to load events:", e);
+        setError("Failed to load event details.");
+        setEvents([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  // find the event whose slugified title matches route
+  const event = useMemo(
+    () => events.find((e) => slugify(e.title) === slug),
+    [events, slug]
+  );
+
+  if (loading) {
+    return (
+      <MasterLayout>
+        <div className="text-white p-10">Loading event…</div>
+      </MasterLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <MasterLayout>
+        <div className="text-red-400 p-10">{error}</div>
+      </MasterLayout>
+    );
+  }
 
   if (!event) {
-    return <div className="text-white p-10">Event not found</div>;
+    return (
+      <MasterLayout>
+        <div className="text-white p-10">Event not found</div>
+      </MasterLayout>
+    );
   }
 
   return (
     <MasterLayout>
-      <div className="flex flex-col justify-center items-center bg-black pb-10  relative">
+      <div className="flex flex-col justify-center items-center bg-black pb-10 relative">
         {/* Top Banner */}
         <div className="relative md:h-screen h-[600px] w-full">
           <Image
-            src="/event-collage.avif"
+            src={event.featured_image || "/event-collage.avif"}
             alt={event.title}
             fill
             className="object-cover"
             priority
           />
           <div className="absolute inset-0 flex justify-center items-center z-10">
-            <Link
-              href="/buyticket"
-              className="flex justify-center items-center cursor-pointer h-[64px] md:w-[250px] w-[250px] bg-red-600 border text-[16px] border-white rounded text-white shadow-lg"
-            >
-              BUY TICKETS
-            </Link>
+            {event.ticket_available && (
+              <Link
+                href={`/buyticket?eventId=${event.id}`}
+                className="flex justify-center items-center cursor-pointer h-[64px] md:w-[250px] w-[250px] bg-red-600 border text-[16px] border-white rounded text-white shadow-lg"
+              >
+                BUY TICKETS
+              </Link>
+            )}
           </div>
         </div>
 
         {/* Event Detail Section */}
         <div className="relative md:h-[750px] h-[800px] w-full bg-white">
           <Image
-            src="/galleryImage.avif"
+            src={"/galleryImage.avif"}
             alt={event.title}
             fill
             className="object-cover opacity-30"
@@ -53,27 +100,17 @@ const EventDetailPage = () => {
                 {event.title}
               </h1>
               <p className="text-sm md:text-base font-medium">
-                📅 {event.date} | 📍 {event.venue}, {event.location}
+                📅 {new Date(event.date).toLocaleString()} | 📍 {event.venue}
+                {event.venue && event.location ? ", " : ""}
+                {event.location}
               </p>
               <hr className="border border-gray-300 w-[50%] mx-auto" />
+
+              {/* If you store a description, show it; otherwise fallback copy */}
+              <p>{event.description || "Details coming soon. Stay tuned!"}</p>
               <p>
                 {
-                  "Lorem Ipsum is simply dummy text of the printing and typesetting industry. It has been the industry's standard dummy text ever since the 1500s."
-                }
-              </p>
-              <p>
-                {
-                  "It survived five centuries and the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s."
-                }
-              </p>
-              <p>
-                {
-                  "Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in classical Latin literature from 45 BC."
-                }
-              </p>
-              <p>
-                {
-                  " The standard chunk of Lorem Ipsum used since the 1500s is reproduced below for those interested."
+                  "This event page is generated dynamically by matching the slugified title to your backend events table."
                 }
               </p>
             </div>
