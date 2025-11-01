@@ -1,4 +1,7 @@
+"use client";
+
 import React, { useState } from "react";
+import { ConnectAPI } from "@/app/api/apiService";
 
 const Connect: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -9,26 +12,45 @@ const Connect: React.FC = () => {
     city: "",
     comment: "",
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData((p) => ({ ...p, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Submitted Data:", formData);
-
-    setFormData({
-      fullName: "",
-      email: "",
-      contact: "",
-      country: "",
-      city: "",
-      comment: "",
-    });
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await ConnectAPI.create({
+        fullName: formData.fullName,
+        email: formData.email,
+        contact: formData.contact,
+        country: formData.country || undefined,
+        city: formData.city || undefined,
+        comment: formData.comment || undefined,
+      });
+      setSuccess("Thank you! Your message has been submitted.");
+      setFormData({
+        fullName: "",
+        email: "",
+        contact: "",
+        country: "",
+        city: "",
+        comment: "",
+      });
+    } catch (err: any) {
+      setError(err?.message || "Failed to submit. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const renderLabel = (text: string, required = true) => (
@@ -39,11 +61,22 @@ const Connect: React.FC = () => {
   );
 
   return (
-    <div className="flex flex-col mgap-10 justify-center items-center min-h-screen bg-black text-white md:pt-[150px] md:pb-10">
+    <div className="flex flex-col justify-center items-center min-h-screen bg-black text-white md:pt-[150px] md:pb-10">
       <form
         onSubmit={handleSubmit}
         className="md:grid md:grid-cols-2 flex flex-col gap-y-5 gap-x-8 justify-center items-start"
       >
+        {success && (
+          <div className="md:col-span-2 bg-green-600/90 px-4 py-2 rounded">
+            {success}
+          </div>
+        )}
+        {error && (
+          <div className="md:col-span-2 bg-red-600/90 px-4 py-2 rounded">
+            {error}
+          </div>
+        )}
+
         <div className="flex flex-col gap-2">
           {renderLabel("Full Name")}
           <input
@@ -123,9 +156,10 @@ const Connect: React.FC = () => {
         <div className="col-span-2 flex justify-center mt-4">
           <button
             type="submit"
-            className="h-[48px] w-[300px] bg-red-600 text-white font-bold rounded hover:cursor-pointer"
+            disabled={submitting}
+            className="h-[48px] w-[300px] bg-red-600 text-white font-bold rounded hover:cursor-pointer disabled:opacity-60"
           >
-            Submit
+            {submitting ? "Submitting..." : "Submit"}
           </button>
         </div>
       </form>

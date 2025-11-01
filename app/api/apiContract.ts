@@ -66,6 +66,46 @@ export type GalleriesQuery = ListQuery & { eventId?: ID };
 export type AlbumsQuery = ListQuery & { galleryId?: ID };
 export type TicketsQuery = ListQuery & { eventId?: ID };
 
+export type ConnectEntry = {
+  id: number;
+  full_name: string;
+  email: string;
+  contact: string;
+  country: string | null;
+  city: string | null;
+  comment: string | null;
+  created_at: string; // ISO
+};
+export type NewConnectEntry = Omit<ConnectEntry, "id" | "created_at">;
+
+export type ReportCounters = {
+  totalEvents: number;
+  ticketsSold: number;
+  uniqueBuyers: number;
+};
+
+export type ReportEventRow = {
+  event_id: number;
+  event_title: string;
+  event_date: string;     // ISO
+  tickets_sold: number;
+  unique_buyers: number;
+  last_purchase_at: string | null;
+};
+
+export type ReportDailyRow = {
+  day: string;           // YYYY-MM-DD
+  tickets_sold: number;
+};
+
+export type ReportSummary = {
+  counters: ReportCounters;
+  perEvent: ReportEventRow[];
+  daily: ReportDailyRow[];
+};
+
+
+
 export type ApiError = {
   status: number;
   message: string;

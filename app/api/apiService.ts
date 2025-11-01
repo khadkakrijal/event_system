@@ -29,6 +29,8 @@ import type {
   ListQuery,
   GalleryCreate,
   GalleryUpdate,
+  ConnectEntry,
+  ReportSummary
 } from "./apiContract";
 
 // small helper to build query strings
@@ -216,4 +218,56 @@ export const TicketsAPI = {
     request<{ success: true }>(`/tickets/${id}`, {
       method: "DELETE",
     }),
+};
+
+
+
+// ------------------- CONNECT (feedback) -------------------
+export const ConnectAPI = {
+  list: async () => {
+    const res = await fetch(`${API_BASE}/connect`, {
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) throw new Error("Failed to load connect entries");
+    return (await res.json()) as ConnectEntry[];
+  },
+
+  create: async (payload: {
+    fullName: string;
+    email: string;
+    contact: string;
+    country?: string;
+    city?: string;
+    comment?: string;
+  }) => {
+    const res = await fetch(`${API_BASE}/connect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) throw new Error("Failed to submit");
+    return (await res.json()) as ConnectEntry;
+  },
+
+  remove: async (id: number) => {
+    const res = await fetch(`${API_BASE}/connect/${id}`, {
+      method: "DELETE",
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) throw new Error("Failed to delete");
+    return true;
+  },
+};
+
+export const ReportsAPI = {
+  summary: (params: { from?: string; to?: string; eventId?: number; signal?: AbortSignal } = {}) =>
+    request<ReportSummary>(
+      `/reports/summary${qs({
+        from: params.from,
+        to: params.to,
+        eventId: params.eventId,
+      })}`,
+      { signal: params.signal }
+    ),
 };
