@@ -3,8 +3,17 @@
 import React, { useState } from "react";
 import { ConnectAPI } from "@/app/api/apiService";
 
+type ConnectForm = {
+  fullName: string;
+  email: string;
+  contact: string;
+  country: string;
+  city: string;
+  comment: string;
+};
+
 const Connect: React.FC = () => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ConnectForm>({
     fullName: "",
     email: "",
     contact: "",
@@ -46,8 +55,9 @@ const Connect: React.FC = () => {
         city: "",
         comment: "",
       });
-    } catch (err: any) {
-      setError(err?.message || "Failed to submit. Please try again.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to submit. Please try again.";
+      setError(message);
     } finally {
       setSubmitting(false);
     }

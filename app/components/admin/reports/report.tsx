@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ReportsAPI } from "@/app/api/apiService";
 import type { ReportSummary, ReportEventRow } from "@/app/api/apiContract";
 import { DataTable } from "primereact/datatable";

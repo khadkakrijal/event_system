@@ -8,7 +8,6 @@ import Image from "next/image";
 import Photos from "@/app/components/imageSlider/photos";
 import { EventsAPI, GalleriesAPI, AlbumsAPI } from "@/app/api/apiService";
 import type { Event } from "@/app/api/apiContract";
-import Link from "next/link";
 
 type PhotoItem = { image: string };
 

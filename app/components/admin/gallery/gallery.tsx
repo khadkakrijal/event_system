@@ -17,13 +17,13 @@ import type { Event, Gallery, Album } from "@/app/api/apiContract";
 type GalleryForm = {
   event_id: number | null;
   title: string;
-  title2: string;          // ✅ subtitle field in your DB
-  images: string[];        // base64 strings or URLs to append
+  title2: string; // subtitle field in your DB
+  images: string[]; // base64 strings or URLs to append
 };
 
 type GalleryRow = Gallery & {
   event_title?: string;
-  images?: string[];       // preview images from albums
+  images?: string[]; // preview images from albums
 };
 
 const initialForm: GalleryForm = {
@@ -32,6 +32,10 @@ const initialForm: GalleryForm = {
   title2: "",
   images: [],
 };
+
+// Narrow keys for the text inputs (removes the need for `any`)
+const textFields = ["title", "title2"] as const;
+type TextField = (typeof textFields)[number];
 
 const AdminGalleryPage: React.FC = () => {
   // lists
@@ -50,8 +54,13 @@ const AdminGalleryPage: React.FC = () => {
 
   // ---------- LOADERS ----------
   const loadEvents = async () => {
-    const data = await EventsAPI.list();
-    setEvents(Array.isArray(data) ? data : []);
+    try {
+      const data = await EventsAPI.list();
+      setEvents(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load events:", err);
+      setEvents([]);
+    }
   };
 
   const loadGalleries = async () => {
@@ -61,7 +70,7 @@ const AdminGalleryPage: React.FC = () => {
       const data: Gallery[] = await GalleriesAPI.list();
       const base: GalleryRow[] = (data || []).map((g) => ({
         ...g,
-        event_title: events.find((e) => e.id === g.event_id)?.title || "",
+        event_title: events.find((ev) => ev.id === g.event_id)?.title || "",
         images: [],
       }));
 
@@ -85,13 +94,14 @@ const AdminGalleryPage: React.FC = () => {
       // 3) ensure event titles (if events already loaded)
       const withTitles = hydrated.map((g) => ({
         ...g,
-        event_title: g.event_title || events.find((e) => e.id === g.event_id)?.title || "",
+        event_title:
+          g.event_title || events.find((ev) => ev.id === g.event_id)?.title || "",
       }));
 
       setGalleries(withTitles);
       setError(null);
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error("Failed to load galleries:", err);
       setError("Failed to load galleries");
       setGalleries([]);
     } finally {
@@ -133,8 +143,9 @@ const AdminGalleryPage: React.FC = () => {
 
   // ---------- FORM HANDLERS ----------
   const handleFieldChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target as HTMLInputElement;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const { name, value } = e.target;
+    const key = name as TextField; // narrow to "title" | "title2"
+    setForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleEventSelect = (value: number | null) => {
@@ -168,7 +179,7 @@ const AdminGalleryPage: React.FC = () => {
         const created: Gallery = await GalleriesAPI.create({
           event_id: form.event_id!,
           title: form.title,
-          title2: form.title2,     // ✅ send title2
+          title2: form.title2,
         });
 
         if (created?.id && form.images.length > 0) {
@@ -186,7 +197,7 @@ const AdminGalleryPage: React.FC = () => {
         await GalleriesAPI.update(editId, {
           event_id: form.event_id!,
           title: form.title,
-          title2: form.title2,     // ✅ send title2
+          title2: form.title2,
         });
 
         // Append any newly-selected images as new albums
@@ -206,8 +217,8 @@ const AdminGalleryPage: React.FC = () => {
       setForm(initialForm);
       setEditId(null);
       await loadGalleries(); // refresh table
-    } catch (e) {
-      console.error("Save failed:", e);
+    } catch (err) {
+      console.error("Save failed:", err);
     } finally {
       setSaving(false);
     }
@@ -220,8 +231,8 @@ const AdminGalleryPage: React.FC = () => {
     try {
       await GalleriesAPI.remove(id);
       await loadGalleries();
-    } catch (e) {
-      console.error("Delete failed:", e);
+    } catch (err) {
+      console.error("Delete failed:", err);
     }
   };
 
@@ -268,7 +279,7 @@ const AdminGalleryPage: React.FC = () => {
             <Dropdown
               value={form.event_id}
               options={eventOptions}
-              onChange={(e) => handleEventSelect(e.value ?? null)}
+              onChange={(ev) => handleEventSelect((ev.value as number) ?? null)}
               placeholder="Select an Event"
               className="w-full bg-white text-black rounded-md p-2"
               disabled={eventOptions.length === 0}
@@ -281,7 +292,7 @@ const AdminGalleryPage: React.FC = () => {
           </div>
 
           {/* Title & Subtitle (title2) */}
-          {(["title", "title2"] as const).map((field) => (
+          {textFields.map((field) => (
             <div key={field} className="flex flex-col">
               <label htmlFor={field} className="mb-2 font-semibold">
                 {field === "title2" ? "Subtitle" : "Title"}
@@ -289,7 +300,7 @@ const AdminGalleryPage: React.FC = () => {
               <InputText
                 id={field}
                 name={field}
-                value={(form as any)[field] || ""}
+                value={(form[field] as string) ?? ""}
                 onChange={handleFieldChange}
                 className="border bg-white border-gray-300 text-black px-4 py-2 rounded-md shadow-sm"
                 required={field === "title"}
@@ -303,10 +314,15 @@ const AdminGalleryPage: React.FC = () => {
               Gallery Images
             </label>
             <div className="flex items-center justify-between bg-white rounded-md p-4 border border-gray-300">
-              <label htmlFor="image-upload" className="flex items-center gap-2 text-black cursor-pointer">
+              <label
+                htmlFor="image-upload"
+                className="flex items-center gap-2 text-black cursor-pointer"
+              >
                 <FaFileUpload className="text-xl" />
                 <span>
-                  {form.images.length > 0 ? `${form.images.length} Images Selected` : "Choose Images"}
+                  {form.images.length > 0
+                    ? `${form.images.length} Images Selected`
+                    : "Choose Images"}
                 </span>
               </label>
               <input
@@ -327,7 +343,13 @@ const AdminGalleryPage: React.FC = () => {
 
           <div className="flex justify-end pt-2">
             <Button
-              label={saving ? "Saving..." : editId == null ? "Create Gallery" : "Update Gallery"}
+              label={
+                saving
+                  ? "Saving..."
+                  : editId == null
+                  ? "Create Gallery"
+                  : "Update Gallery"
+              }
               icon="pi pi-check"
               type="submit"
               disabled={saving}

@@ -7,6 +7,13 @@ import { EventsAPI, TicketsAPI } from "@/app/api/apiService";
 import type { Event } from "@/app/api/apiContract";
 import slugify from "@/app/utils/slugify";
 
+type TicketForm = {
+  fullName: string;
+  email: string;
+  eventId: string; // select value; coerced to number on submit
+  quantity: number;
+  ticketType: "Standard" | "VIP" | "Student";
+};
 
 const BuyTicket: React.FC = () => {
   const searchParams = useSearchParams();
@@ -19,13 +26,13 @@ const BuyTicket: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-    const router = useRouter(); 
+  const router = useRouter();
 
   // Form state
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<TicketForm>({
     fullName: "",
     email: "",
-    eventId: "",   // string for <select>; we’ll coerce to number on submit
+    eventId: "", // string for <select>; we’ll coerce to number on submit
     quantity: 1,
     ticketType: "Standard",
   });
@@ -37,7 +44,7 @@ const BuyTicket: React.FC = () => {
         const data = await EventsAPI.list(); // all events
         setEvents(Array.isArray(data) ? data : []);
         setError(null);
-      } catch (e) {
+      } catch (e: unknown) {
         console.error("Failed to load events:", e);
         setError("Failed to load events.");
         setEvents([]);
@@ -87,7 +94,7 @@ const BuyTicket: React.FC = () => {
       [name]:
         name === "quantity"
           ? Math.max(1, Number(value) || 1)
-          : value,
+          : (value as TicketForm[keyof TicketForm]),
     }));
   };
 
@@ -123,9 +130,11 @@ const BuyTicket: React.FC = () => {
         quantity: 1,
         ticketType: "Standard",
       }));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Ticket create failed:", err);
-      setError(err?.message || "Failed to create ticket.");
+      const message =
+        err instanceof Error ? err.message : "Failed to create ticket.";
+      setError(message);
     }
   };
 
@@ -197,7 +206,7 @@ const BuyTicket: React.FC = () => {
                   </option>
                 ))}
               </select>
-              {(!loading && availableEvents.length === 0) && (
+              {!loading && availableEvents.length === 0 && (
                 <p className="mt-2 text-sm text-gray-300">
                   No events currently selling tickets.
                 </p>

@@ -9,10 +9,10 @@ import VideoGrid from "./components/videoGrid/videogrid";
 export default function Home() {
   return (
     <MasterLayout>
-      <CoverPage/>
-      <EventsCover/>
-      <VideoGrid/>
-    <Calenderpage/>
+      <CoverPage />
+      <EventsCover />
+      <VideoGrid />
+      <Calenderpage />
     </MasterLayout>
   );
 }

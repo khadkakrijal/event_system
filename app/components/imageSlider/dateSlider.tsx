@@ -1,4 +1,3 @@
-// app/components/calendar/dateSlider.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -58,7 +57,7 @@ const EventCalendar: React.FC<EventCalendarProps> = ({
 
         {/* Month strip */}
         <div className="md:w-[69.4vw] md:h-[4.8vw] border rounded-md border-white bg-black text-white flex justify-start items-center overflow-hidden">
-          {rows.map((row, idx) => {
+          {rows.map((row) => {
             const isSelected = !loading && selectedKey === row.key;
             const subtitle = loading
               ? "…"
@@ -73,7 +72,7 @@ const EventCalendar: React.FC<EventCalendarProps> = ({
                 }`}
                 style={{ transform: `translate(${shiftX}00%, 0%)` }}
               >
-                <div className="felx flex-col">
+                <div className="flex flex-col">
                   <div className="text-[1.6rem] font-bold">{row.title}</div>
                   <div className="text-[1rem]">{subtitle}</div>
                 </div>

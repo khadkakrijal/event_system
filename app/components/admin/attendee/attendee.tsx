@@ -37,9 +37,9 @@ const AdminAttendeesPage: React.FC = () => {
       });
       setTickets(Array.isArray(data) ? data : []);
       setError(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error loading tickets:", err);
-      setError("Failed to load attendees.");
+     setError(err instanceof Error ? err.message : "Failed to load attendees.");
       setTickets([]);
     } finally {
       setLoading(false);

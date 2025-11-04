@@ -1,9 +1,11 @@
-"use client";
-import React from "react";
-import BuyTicket from "../components/buyTicket/buyTicket";
+// app/buyticket/page.tsx
+import { Suspense } from "react";
+import BuyTicket from "@/app/components/buyTicket/buyTicket";
 
-
-const BuyTicketPage: React.FC= () => {
-  return <BuyTicket />;
-};
-export default BuyTicketPage;
+export default function BuyTicketPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-white">Loading…</div>}>
+      <BuyTicket />
+    </Suspense>
+  );
+}

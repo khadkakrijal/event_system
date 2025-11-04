@@ -44,10 +44,16 @@ const PastEvent: React.FC = () => {
 
   return (
     <MasterLayout>
-      <div className="bg-black flex flex-col gap-6 justify-center items-center pt-40 pb-16">
-        <h2 className="text-3xl font-bold uppercase text-white mb-4">
-          Highlights from the Past
-        </h2>
+      <div
+        className={`bg-black flex flex-col gap-6 justify-center items-center ${
+          error ? "pt-[69px]" : "pt-40"
+        } pb-16`}
+      >
+        {loading && error && (
+          <h2 className="text-3xl font-bold uppercase text-white mb-4">
+            Highlights from the Past
+          </h2>
+        )}
 
         {loading && <p className="text-white/80">Loading events…</p>}
         {error && <p className="text-red-400">Error: {error}</p>}

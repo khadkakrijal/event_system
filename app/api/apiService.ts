@@ -10,13 +10,11 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 import type {
-  ApiError,
   Event,
   NewEvent,
   UpdateEvent,
   EventsQuery,
   Gallery,
-  GalleriesQuery,
   Album,
   NewAlbum,
   UpdateAlbum,
@@ -30,14 +28,34 @@ import type {
   GalleryCreate,
   GalleryUpdate,
   ConnectEntry,
-  ReportSummary
+  ReportSummary,
 } from "./apiContract";
 
-// small helper to build query strings
-function qs(params: Record<string, any> = {}) {
+/* ------------------- helpers ------------------- */
+
+type QueryPrimitive = string | number | boolean | null | undefined | Date;
+
+function isRecord(x: unknown): x is Record<string, unknown> {
+  return typeof x === "object" && x !== null;
+}
+function hasMessage(x: unknown): x is { message: string } {
+  return isRecord(x) && typeof x.message === "string";
+}
+function hasStrField<K extends string>(
+  x: unknown,
+  key: K
+): x is Record<K, string> {
+  return isRecord(x) && typeof (x as Record<string, unknown>)[key] === "string";
+}
+
+// small helper to build query strings (no `any`)
+function qs(params: Record<string, QueryPrimitive> = {}) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== "") search.set(k, String(v));
+    if (v === undefined || v === null || v === "") return;
+    const value =
+      v instanceof Date ? v.toISOString() : typeof v === "boolean" ? String(v) : String(v);
+    search.set(k, value);
   });
   const s = search.toString();
   return s ? `?${s}` : "";
@@ -63,19 +81,26 @@ async function request<T>(
       : [200, 201];
 
     const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    const data: unknown = text ? JSON.parse(text) : null;
 
     if (!ok.includes(res.status)) {
-      throw new Error(
-        (data && (data.error || data.message)) || `HTTP ${res.status}`
-      );
+      const msg =
+        (hasStrField(data, "error") && data.error) ||
+        (hasStrField(data, "message") && data.message) ||
+        `HTTP ${res.status}`;
+      throw new Error(msg);
     }
     return data as T;
-  } catch (err: any) {
-    if (err?.name === "AbortError" || err?.message?.includes("aborted")) {
+  } catch (err: unknown) {
+    // treat fetch aborts / timeouts as user-cancelled
+    if (
+      (err instanceof DOMException && err.name === "AbortError") ||
+      (err instanceof Error && err.message.includes("aborted")) ||
+      (hasMessage(err) && err.message.includes("aborted"))
+    ) {
       return Promise.reject();
     }
-    throw err;
+    throw err instanceof Error ? err : new Error("Unknown error");
   }
 }
 
@@ -111,8 +136,8 @@ export const EventsAPI = {
 
 export const GalleriesAPI = {
   list: async (params?: { eventId?: number }) => {
-    const qs = params?.eventId ? `?eventId=${params.eventId}` : "";
-    const res = await fetch(`${API_BASE}/galleries${qs}`, {
+    const query = params?.eventId ? `?eventId=${params.eventId}` : "";
+    const res = await fetch(`${API_BASE}/galleries${query}`, {
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) throw new Error("Failed to load galleries");
@@ -138,7 +163,6 @@ export const GalleriesAPI = {
     return (await res.json()) as Gallery;
   },
 
-  // 🔧 allow event_id in update
   update: async (id: number, body: GalleryUpdate) => {
     const res = await fetch(`${API_BASE}/galleries/${id}`, {
       method: "PUT",
@@ -220,9 +244,8 @@ export const TicketsAPI = {
     }),
 };
 
+/* ------------------- CONNECT (feedback) ------------------- */
 
-
-// ------------------- CONNECT (feedback) -------------------
 export const ConnectAPI = {
   list: async () => {
     const res = await fetch(`${API_BASE}/connect`, {
@@ -260,8 +283,15 @@ export const ConnectAPI = {
   },
 };
 
+/* ------------------- REPORTS ------------------- */
+
 export const ReportsAPI = {
-  summary: (params: { from?: string; to?: string; eventId?: number; signal?: AbortSignal } = {}) =>
+  summary: (params: {
+    from?: string;
+    to?: string;
+    eventId?: number;
+    signal?: AbortSignal;
+  } = {}) =>
     request<ReportSummary>(
       `/reports/summary${qs({
         from: params.from,

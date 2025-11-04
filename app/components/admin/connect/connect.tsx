@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { ConnectAPI } from "@/app/api/apiService";
@@ -18,8 +18,10 @@ const AdminConnectPage = () => {
       const data = await ConnectAPI.list();
       setRows(data || []);
       setErr(null);
-    } catch (e: any) {
-      setErr(e?.message || "Failed to load contact submissions");
+    } catch (e: unknown) {
+      const message =
+        e instanceof Error ? e.message : "Failed to load contact submissions";
+      setErr(message);
       setRows([]);
     } finally {
       setLoading(false);
@@ -46,7 +48,7 @@ const AdminConnectPage = () => {
           try {
             await ConnectAPI.remove(row.id);
             await load();
-          } catch (e) {
+          } catch  {
             alert("Delete failed.");
           }
         }}
@@ -57,11 +59,21 @@ const AdminConnectPage = () => {
   return (
     <div className="p-8 min-h-screen bg-gray-100">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Contact Submissions</h1>
-        <Button label="Refresh" onClick={load} className="bg-slate-700 text-white border-none px-3 py-2" />
+        <h1 className="text-3xl font-bold text-gray-800">
+          Contact Submissions
+        </h1>
+        <Button
+          label="Refresh"
+          onClick={load}
+          className="bg-slate-700 text-white border-none px-3 py-2"
+        />
       </div>
 
-      {err && <div className="mb-3 bg-red-100 text-red-700 px-4 py-2 rounded">{err}</div>}
+      {err && (
+        <div className="mb-3 bg-red-100 text-red-700 px-4 py-2 rounded">
+          {err}
+        </div>
+      )}
 
       <div className="bg-white shadow-md rounded-lg overflow-hidden p-2">
         <DataTable
@@ -73,14 +85,43 @@ const AdminConnectPage = () => {
           className="p-datatable-sm "
           emptyMessage="No submissions yet."
         >
-          <Column field="full_name" header="Name" body={nameBody} bodyClassName="border px-2 py-1 max-w-[220px] truncate" />
-          <Column field="email" header="Email" bodyClassName="border px-2 py-1 max-w-[220px] truncate" />
-          <Column field="contact" header="Contact" bodyClassName="border px-2 py-1" />
-          <Column field="country" header="Country" bodyClassName="border px-2 py-1" />
+          <Column
+            field="full_name"
+            header="Name"
+            body={nameBody}
+            bodyClassName="border px-2 py-1 max-w-[220px] truncate"
+          />
+          <Column
+            field="email"
+            header="Email"
+            bodyClassName="border px-2 py-1 max-w-[220px] truncate"
+          />
+          <Column
+            field="contact"
+            header="Contact"
+            bodyClassName="border px-2 py-1"
+          />
+          <Column
+            field="country"
+            header="Country"
+            bodyClassName="border px-2 py-1"
+          />
           <Column field="city" header="City" bodyClassName="border px-2 py-1" />
-          <Column field="comment" header="Comments" bodyClassName="border px-2 py-1 max-w-[280px] whitespace-nowrap overflow-hidden text-ellipsis" />
-          <Column header="Submitted" body={dateBody} bodyClassName="border px-2 py-1" />
-          <Column header="Actions" body={actionsBody} bodyClassName="border px-2 py-1" />
+          <Column
+            field="comment"
+            header="Comments"
+            bodyClassName="border px-2 py-1 max-w-[280px] whitespace-nowrap overflow-hidden text-ellipsis"
+          />
+          <Column
+            header="Submitted"
+            body={dateBody}
+            bodyClassName="border px-2 py-1"
+          />
+          <Column
+            header="Actions"
+            body={actionsBody}
+            bodyClassName="border px-2 py-1"
+          />
         </DataTable>
       </div>
     </div>

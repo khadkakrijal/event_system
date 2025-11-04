@@ -17,9 +17,18 @@ const toISODate = (d: string) => (d.includes("T") ? d : `${d}T00:00:00Z`);
 const fromISODateOnly = (iso?: string) =>
   iso ? new Date(iso).toISOString().slice(0, 10) : "";
 
-type FormEvent = Partial<Pick<Event,
-  "title" | "date" | "location" | "venue" | "featured_image" | "description" | "ticket_available"
->>;
+type FormEvent = Partial<
+  Pick<
+    Event,
+    | "title"
+    | "date"
+    | "location"
+    | "venue"
+    | "featured_image"
+    | "description"
+    | "ticket_available"
+  >
+>;
 
 const initialForm: FormEvent = {
   title: "",
@@ -30,6 +39,10 @@ const initialForm: FormEvent = {
   description: "",
   ticket_available: true,
 };
+
+// Typed list of text fields used in the form
+const textFields = ["title", "date", "location", "venue"] as const;
+type TextField = (typeof textFields)[number];
 
 const AdminEventsPage: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -44,7 +57,7 @@ const AdminEventsPage: React.FC = () => {
       setLoading(true);
       const data = await EventsAPI.list(); // GET /events
       setEvents(data || []);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error("Failed to load events:", e);
       setEvents([]);
     } finally {
@@ -77,7 +90,9 @@ const AdminEventsPage: React.FC = () => {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const key = e.target.name as TextField;
+    const value = e.target.value;
+    setForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,18 +122,16 @@ const AdminEventsPage: React.FC = () => {
       };
 
       if (editId == null) {
-        // CREATE
         await EventsAPI.create(payload);
       } else {
-        // UPDATE
         await EventsAPI.update(editId, payload);
       }
 
       setDialogVisible(false);
       setForm(initialForm);
       setEditId(null);
-      await loadEvents(); // refresh table
-    } catch (e) {
+      await loadEvents();
+    } catch (e: unknown) {
       console.error("Save failed:", e);
     } finally {
       setSaving(false);
@@ -131,7 +144,7 @@ const AdminEventsPage: React.FC = () => {
       if (!ok) return;
       await EventsAPI.remove(id);
       await loadEvents();
-    } catch (e) {
+    } catch (e: unknown) {
       console.error("Delete failed:", e);
     }
   };
@@ -170,16 +183,21 @@ const AdminEventsPage: React.FC = () => {
           }}
           className="flex flex-col gap-6 px-4 pt-4 pb-6 text-white"
         >
-          {["title", "date", "location", "venue"].map((field) => (
+          {textFields.map((field) => (
             <div key={field} className="flex flex-col">
-              <label htmlFor={field} className="mb-2 font-semibold text-white capitalize">
-                {field === "date" ? "Event Date" : field.charAt(0).toUpperCase() + field.slice(1)}
+              <label
+                htmlFor={field}
+                className="mb-2 font-semibold text-white capitalize"
+              >
+                {field === "date"
+                  ? "Event Date"
+                  : field.charAt(0).toUpperCase() + field.slice(1)}
               </label>
               <InputText
                 id={field}
                 name={field}
                 type={field === "date" ? "date" : "text"}
-                value={(form as any)[field] || ""}
+                value={(form[field] as string) ?? ""}
                 onChange={handleChange}
                 className="border bg-white border-gray-300 text-black px-4 py-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
@@ -192,17 +210,34 @@ const AdminEventsPage: React.FC = () => {
               Event Image
             </label>
             <div className="flex items-center justify-between bg-white rounded-md p-3 border border-gray-300">
-              <label htmlFor="image-upload" className="flex items-center gap-2 text-black cursor-pointer">
+              <label
+                htmlFor="image-upload"
+                className="flex items-center gap-2 text-black cursor-pointer"
+              >
                 <FaFileUpload className="text-xl" />
-                <span>{form.featured_image ? "Image Selected" : "Choose Image"}</span>
+                <span>
+                  {form.featured_image ? "Image Selected" : "Choose Image"}
+                </span>
               </label>
-              <input id="image-upload" type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageUpload}
+              />
             </div>
           </div>
 
           <div className="flex justify-end pt-2">
             <Button
-              label={saving ? "Saving..." : editId == null ? "Create Event" : "Update Event"}
+              label={
+                saving
+                  ? "Saving..."
+                  : editId == null
+                  ? "Create Event"
+                  : "Update Event"
+              }
               icon="pi pi-check"
               type="submit"
               disabled={saving}
@@ -223,10 +258,22 @@ const AdminEventsPage: React.FC = () => {
           className="p-datatable-sm border border-gray-300 p-2 "
         >
           {/* <Column field="id" header="ID" style={{ width: 80 }} /> */}
-          <Column field="title" header="Title"  bodyClassName="py-6" />
-          <Column field="date" header="Date" body={(r: Event) => new Date(r.date).toLocaleString()} />
-          <Column field="location" header="Location"  bodyClassName="max-w-[150px] truncate "/>
-          <Column field="venue" header="Venue" bodyClassName="max-w-[150px] truncate "/>
+          <Column field="title" header="Title" bodyClassName="py-6" />
+          <Column
+            field="date"
+            header="Date"
+            body={(r: Event) => new Date(r.date).toLocaleString()}
+          />
+          <Column
+            field="location"
+            header="Location"
+            bodyClassName="max-w-[150px] truncate "
+          />
+          <Column
+            field="venue"
+            header="Venue"
+            bodyClassName="max-w-[150px] truncate "
+          />
           <Column
             field="featured_image"
             header="Image"
