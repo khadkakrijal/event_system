@@ -58,6 +58,7 @@ const AdminEventsPage: React.FC = () => {
       const data = await EventsAPI.list(); // GET /events
       setEvents(data || []);
     } catch (e: unknown) {
+      // eslint-disable-next-line no-console
       console.error("Failed to load events:", e);
       setEvents([]);
     } finally {
@@ -89,9 +90,15 @@ const AdminEventsPage: React.FC = () => {
     setDialogVisible(true);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const key = e.target.name as TextField;
-    const value = e.target.value;
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    if (name === "description") {
+      setForm((prev) => ({ ...prev, description: value }));
+      return;
+    }
+    const key = name as TextField;
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -132,6 +139,7 @@ const AdminEventsPage: React.FC = () => {
       setEditId(null);
       await loadEvents();
     } catch (e: unknown) {
+      // eslint-disable-next-line no-console
       console.error("Save failed:", e);
     } finally {
       setSaving(false);
@@ -145,8 +153,16 @@ const AdminEventsPage: React.FC = () => {
       await EventsAPI.remove(id);
       await loadEvents();
     } catch (e: unknown) {
+      // eslint-disable-next-line no-console
       console.error("Delete failed:", e);
     }
+  };
+
+  // Small helper to render truncated description safely
+  const renderDescription = (row: Event) => {
+    const text = row.description || "";
+    const short = text.length > 120 ? text.slice(0, 120) + "…" : text;
+    return <span title={text}>{short}</span>;
   };
 
   return (
@@ -172,7 +188,7 @@ const AdminEventsPage: React.FC = () => {
           </div>
         }
         visible={dialogVisible}
-        style={{ width: "100%", maxWidth: "520px" }}
+        style={{ width: "100%", maxWidth: "620px" }}
         onHide={() => setDialogVisible(false)}
         className="rounded-md shadow-lg bg-gradient-to-br from-gray-500 to-black text-white p-2"
       >
@@ -205,8 +221,25 @@ const AdminEventsPage: React.FC = () => {
             </div>
           ))}
 
+          {/* Description (textarea) */}
           <div className="flex flex-col">
-            <label htmlFor="image" className="mb-2 font-semibold text-white">
+            <label htmlFor="description" className="mb-2 font-semibold text-white">
+              Description
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              value={form.description ?? ""}
+              onChange={handleChange}
+              rows={4}
+              placeholder="Short summary about the event…"
+              className="border bg-white border-gray-300 text-black px-4 py-2 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Event Image */}
+          <div className="flex flex-col">
+            <label htmlFor="image-upload" className="mb-2 font-semibold text-white">
               Event Image
             </label>
             <div className="flex items-center justify-between bg-white rounded-md p-3 border border-gray-300">
@@ -257,7 +290,6 @@ const AdminEventsPage: React.FC = () => {
           loading={loading}
           className="p-datatable-sm border border-gray-300 p-2 "
         >
-          {/* <Column field="id" header="ID" style={{ width: 80 }} /> */}
           <Column field="title" header="Title" bodyClassName="py-6" />
           <Column
             field="date"
@@ -273,6 +305,13 @@ const AdminEventsPage: React.FC = () => {
             field="venue"
             header="Venue"
             bodyClassName="max-w-[150px] truncate "
+          />
+          {/* NEW: Description column (truncated) */}
+          <Column
+            field="description"
+            header="Description"
+            body={renderDescription}
+            bodyClassName="max-w-[280px] truncate "
           />
           <Column
             field="featured_image"
