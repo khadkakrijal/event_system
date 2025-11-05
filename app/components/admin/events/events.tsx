@@ -311,7 +311,7 @@ const AdminEventsPage: React.FC = () => {
             field="description"
             header="Description"
             body={renderDescription}
-            bodyClassName="max-w-[280px] truncate "
+            bodyClassName="max-w-[150px]  truncate "
           />
           <Column
             field="featured_image"
