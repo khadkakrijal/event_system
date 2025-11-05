@@ -290,7 +290,7 @@ const AdminEventsPage: React.FC = () => {
           loading={loading}
           className="p-datatable-sm border border-gray-300 p-2 "
         >
-          <Column field="title" header="Title" bodyClassName="py-6 px-2" />
+          <Column field="title" header="Title" bodyClassName="py-6 " />
           <Column
             field="date"
             header="Date"
@@ -299,19 +299,19 @@ const AdminEventsPage: React.FC = () => {
           <Column
             field="location"
             header="Location"
-            bodyClassName="max-w-[150px] truncate px-2 "
+            bodyClassName="max-w-[120px] truncate px-2 "
           />
           <Column
             field="venue"
             header="Venue"
-            bodyClassName="max-w-[150px] truncate  px-2"
+            bodyClassName="max-w-[130px] truncate  px-2"
           />
           {/* NEW: Description column (truncated) */}
           <Column
             field="description"
             header="Description"
             body={renderDescription}
-            bodyClassName="max-w-[150px]  truncate px-2"
+            bodyClassName="max-w-[160px]  truncate px-2"
           />
           <Column
             field="featured_image"
