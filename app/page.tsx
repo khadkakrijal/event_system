@@ -8,6 +8,7 @@ import VideoGrid from "./components/videoGrid/videogrid";
 
 export default function Home() {
   return (
+    //master component//
     <MasterLayout>
       <CoverPage />
       <EventsCover />
