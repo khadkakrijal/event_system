@@ -290,7 +290,7 @@ const AdminEventsPage: React.FC = () => {
           loading={loading}
           className="p-datatable-sm border border-gray-300 p-2 "
         >
-          <Column field="title" header="Title" bodyClassName="py-6" />
+          <Column field="title" header="Title" bodyClassName="py-6 px-2" />
           <Column
             field="date"
             header="Date"
@@ -299,19 +299,19 @@ const AdminEventsPage: React.FC = () => {
           <Column
             field="location"
             header="Location"
-            bodyClassName="max-w-[150px] truncate "
+            bodyClassName="max-w-[150px] truncate px-2 "
           />
           <Column
             field="venue"
             header="Venue"
-            bodyClassName="max-w-[150px] truncate "
+            bodyClassName="max-w-[150px] truncate  px-2"
           />
           {/* NEW: Description column (truncated) */}
           <Column
             field="description"
             header="Description"
             body={renderDescription}
-            bodyClassName="max-w-[150px]  truncate "
+            bodyClassName="max-w-[150px]  truncate px-2"
           />
           <Column
             field="featured_image"
@@ -329,7 +329,7 @@ const AdminEventsPage: React.FC = () => {
           <Column
             header="Actions"
             body={(row: Event) => (
-              <div className="flex gap-4 text-xl items-center">
+              <div className="flex gap-4 text-xl items-center px-2">
                 <button
                   onClick={() => openEdit(row)}
                   className="text-yellow-600 hover:text-yellow-700"
