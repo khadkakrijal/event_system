@@ -6,7 +6,7 @@ const CoverPage: React.FC = () => {
   return (
     <div className="h-[100vh]">
       <Image
-        src="/events.jpg"
+        src="/event cover.jpeg"
         alt="Event Cover"
         className="object-cover"
         fill
